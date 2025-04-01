@@ -78,3 +78,6 @@ class Biblioteca:
                 return libro
         print(f"No se encontró un libro con el título '{titulo}'.")
         return None
+
+biblioteca = Biblioteca("Biblioteca Central")
+biblioteca.buscar_libro_por_titulo("El principito")
