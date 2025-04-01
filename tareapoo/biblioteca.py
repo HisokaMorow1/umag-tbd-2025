@@ -80,4 +80,10 @@ class Biblioteca:
         return None
 
 biblioteca = Biblioteca("Biblioteca Central")
-biblioteca.buscar_libro_por_titulo("El principito")
+biblioteca.agregar_libro(Libro("El Aleph", "Jorge Luis Borges", "978-987-1104-10-9"))
+biblioteca.buscar_libro_por_titulo("El Aleph")
+biblioteca.buscar_libro_por_titulo("El Aleph").mostrar_info() # type: ignore
+biblioteca.mostrar_libros_disponibles()
+biblioteca.buscar_libro_por_titulo("El Aleph").prestar() # type: ignore
+biblioteca.buscar_libro_por_titulo("El Aleph").mostrar_info() # type: ignore
+biblioteca.buscar_libro_por_titulo("El Aleph").prestar() # type: ignore
