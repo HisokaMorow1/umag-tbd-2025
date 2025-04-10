@@ -1,59 +1,45 @@
-from datetime import datetime
-from typing import Optional
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
-from sqlalchemy import create_engine,String, not_, select
-
-engine = create_engine("postgresql+psycopg:///test_db_2025")
-Session = sessionmaker(engine)
-
-class Base(DeclarativeBase):
-    pass
-
-class Usuario(Base):
-    __tablename__ = "usuarios"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    nombre_usuario: Mapped[str] = mapped_column(String(32),unique=True,index=True)
-    nombre: Mapped[str]
-    apodo: Mapped[Optional[str]]
-    ultimo_loggin: Mapped[Optional[datetime]]
-    creado_en: Mapped[datetime] = mapped_column(default=datetime.now)
-    habilitado: Mapped[bool] = mapped_column(default=True,server_default="1")
-
-    def __repr__(self) -> str:
-        return f"Usuario(id={self.id}, nombre_usuario={self.nombre_usuario},apodo={self.apodo})"
-    
-
-def get_user(username: str) -> Usuario | None:
-    with Session() as session:
-        stmt = select(Usuario).where(Usuario.nombre_usuario == username)
-        return session.execute(stmt).scalar_one_or_none()
-
+from faker import Faker
+from sqlalchemy.sql.functions import user
+from src.models import Usuario
+from src.db import Session
+from src.db_ops import add_email_to_user, crear_grupo, delete_user, disable_user, get_group, get_user_emails, turn_enable_users, get_user, query_users, create_database
+fake = Faker(["es_CL","en_US"])
 def main(): 
-    Base.metadata.create_all(engine)
+    create_database()
     #add_users()
     #query_users()
-    usuario = get_user("hola")
-    print(usuario)
+    # usuario = get_user(username="arilopez")
+    # print(usuario)
 
-def query_users():
+    # disable_user(username="arilopez")
+    # turn_enable_users(username=["jperez","ckent"],enabled=True)
+    # for user in query_users(filter=False):
+    #     print(f"{user.nombre_usuario=},{user.habilitado=}")
+
+    #delete_user(username="arilopez")
+    # add_email_to_user(username="ckent",email="ckent2@umag.cl")
+
+    # with Session() as session:
+    #     usuario = get_user(username="ckent", session=session)
+    #     if usuario is not None:
+    #         print(usuario.emails)
+        
+    # grupo_admins = get_group(name="admins")
+    # print(grupo_admins)
+    
+    # with Session() as session:
+    #     usuario = get_user(username="ckent", session=session)
+    #     if usuario is not None:
+    #         print(usuario.emails)
+
+    #         usuario.grupos = [grupo_admins]
+    #         session.commit()
+    #         print(usuario.grupos)
+
     with Session() as session:
-        stmt =select(Usuario).where(not_( Usuario.apodo.is_(None)))
-        result = session.execute(stmt).scalars()
-        for row in result:
-            print(row)
-
-def add_users():
-    u1 = Usuario(nombre_usuario="jperez", nombre="Juan Pérez")
-    u2 = Usuario(nombre_usuario="ckent", nombre="Clark Kent", apodo="Superman")
-    u3 = Usuario(nombre_usuario="arilopez", nombre="Ariel López")
-
-    with Session() as session:
-        session.add_all([u1, u2, u3])
-
-        print(u1.id)
+        for i in range(20):
+            usuario = Usuario(nombre_usuario=fake.user_name(),nombre=fake.name())
+            session.add(usuario)
         session.commit()
-        print(u1.id)
-
-
 if __name__ == "__main__":
     main()
