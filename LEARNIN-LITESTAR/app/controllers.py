@@ -5,18 +5,25 @@ from litestar import Controller, get, post, patch, delete
 from litestar.di import Provide
 from litestar.dto import DTOData
 from litestar.exceptions import HTTPException
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-from app.dtos import TodoItemCreateDTO, TodoItemReadDTO, TodoItemUpdateDTO
-from app.models import TodoItem
-from app.repositories import TodoItemRepository, provide_todo_item_repo
+from app.dtos import TodoItemCreateDTO, TodoItemReadDTO, TodoItemUpdateDTO, UserReadDTO, UserReadFullDTO, TodoItemReadFullDTO
+from app.models import TodoItem, User
+from app.repositories import TodoItemRepository, UserRepository, provide_todo_item_repo, provide_user_repo
 
 class TodoController(Controller):
     path = "/items"
+    tags = ["items"]
     return_dto = TodoItemReadDTO
     dependencies = {
         "todoitem_repo": Provide(provide_todo_item_repo)
     }
+
+    @get("/{item_id:int}/list", return_dto=TodoItemReadFullDTO)
+    async def list_item_full(self, todoitem_repo: TodoItemRepository, item_id: int) -> TodoItem:
+        try:
+            return todoitem_repo.get(item_id)
+        except NotFoundError:
+            raise HTTPException(status_code=404, detail=f"Item con id ={item_id} no existe")
+
 
     @get("/")
     async def get_list(self, todoitem_repo: TodoItemRepository, done: bool | None = None) -> Sequence[TodoItem]:
@@ -25,10 +32,8 @@ class TodoController(Controller):
         return todoitem_repo.list(ComparisonFilter("done","eq",done)) 
 
     @post("/",dto=TodoItemCreateDTO)
-    async def add_todo(self, data: TodoItem, db_session:Session) -> Sequence[TodoItem]:
-        with db_session.begin():
-            db_session.add(data)
-        return db_session.execute(select(TodoItem)).scalars().all()
+    async def add_todo(self, todoitem_repo:TodoItemRepository, data: TodoItem) -> Sequence[TodoItem]:
+        return todoitem_repo.add(data,auto_commit=True)
     
     @get("/{item_id:int}")
     async def get_item(self, item_id: int, todoitem_repo: TodoItemRepository) -> TodoItem:
@@ -38,44 +43,39 @@ class TodoController(Controller):
             raise HTTPException(status_code=404, detail=f"Item con id ={item_id} no existe")
     
     @patch("/{item_id:int}", dto=TodoItemUpdateDTO)
-    async def update_item(self, item_id: int, data: DTOData[TodoItem], db_session: Session) -> TodoItem:
-        data_dict = data.as_builtins()
-        item =  db_session.execute(select(TodoItem).where(TodoItem.id == item_id)).scalar_one()
-        for field in ("title", "done"):
-            if data_dict[field] is not None:
-                setattr(item, field, data_dict[field])
-        db_session.commit()
+    async def update_item(self, todoitem_repo: TodoItemRepository, item_id: int, data: DTOData[TodoItem]) -> TodoItem:
+        item, _ = todoitem_repo.get_and_update(match_fields= "id", id=item_id, **data.as_builtins(),auto_commit=True)
         return item
     
     @delete("/{item_id:int}")
     async def delete_item(self, item_id: int, todoitem_repo: TodoItemRepository) -> None:
-        todoitem_repo.delete(item_id)
+        todoitem_repo.delete(item_id,auto_commit=True)
 
 
 
-    # @put("/{item_id:int}")
-    # async def update_item(item_id: int ,data: TodoItem) -> list[TodoItem]:
-    #     for t in TODO_LIST:
-    #         if t.id == item_id:
-    #             t.title = data.title
-    #             t.done = data.done
-    #             break
-    #     return TODO_LIST
+class UserConstroller(Controller):
+    path = "/users"
+    tags = ["users"]
+    dependencies = {
+        "users_repo": Provide(provide_user_repo)
+    }
+    return_dto = UserReadDTO
 
+    @get("/")
+    async def list_users(self, users_repo: UserRepository) -> Sequence[User]:
+        return users_repo.list()
+    
+    @get("/{user_id:int}")
+    async def get_user(self, users_repo: UserRepository, user_id: int) -> User:
+        try:
+            return users_repo.get(user_id)
+        except NotFoundError:
+            raise HTTPException(status_code=404, detail=f"User con id ={user_id} no existe")
+        
+    @get("/{user_id:int}/full", return_dto=UserReadFullDTO)
+    async def get_user_full(self, users_repo: UserRepository, user_id: int) -> User:
+        try:
+            return users_repo.get(user_id)
+        except NotFoundError:
+            raise HTTPException(status_code=404, detail=f"User con id ={user_id} no existe")
 
-    # @patch("/{item_id:int}")
-    # async def patch_item(item_id: int ,data: TodoItemUpdate) -> list[TodoItem]:
-    #     for t in TODO_LIST:
-    #         if t.id == item_id:
-    #             if data.title is not None:
-    #                 t.title = data.title
-    #             if data.done is not None:
-    #                 t.done = data.done
-    #             break
-    #     return TODO_LIST
-
-    # @delete("/{item_id:int}")
-    # async def delete_item(item_id:int) -> None:
-    #     for t in TODO_LIST:
-    #         if t.id == item_id:
-    #             TODO_LIST.remove(t)
