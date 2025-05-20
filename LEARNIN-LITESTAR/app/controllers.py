@@ -5,9 +5,9 @@ from litestar import Controller, get, post, patch, delete
 from litestar.di import Provide
 from litestar.dto import DTOData
 from litestar.exceptions import HTTPException
-from app.dtos import TodoItemCreateDTO, TodoItemReadDTO, TodoItemUpdateDTO, UserReadDTO, UserReadFullDTO, TodoItemReadFullDTO
-from app.models import TodoItem, User
-from app.repositories import TodoItemRepository, UserRepository, provide_todo_item_repo, provide_user_repo
+from app.dtos import TagReadDTO, TodoItemCreateDTO, TodoItemReadDTO, TodoItemUpdateDTO, UserCreateDTO, UserReadDTO, UserReadFullDTO, TodoItemReadFullDTO
+from app.models import Tag, TodoItem, User
+from app.repositories import TagRepository, TodoItemRepository, UserRepository, provide_tag_repo, provide_todo_item_repo, provide_user_repo
 
 class TodoController(Controller):
     path = "/items"
@@ -31,9 +31,9 @@ class TodoController(Controller):
             return todoitem_repo.list()
         return todoitem_repo.list(ComparisonFilter("done","eq",done)) 
 
-    @post("/",dto=TodoItemCreateDTO)
-    async def add_todo(self, todoitem_repo:TodoItemRepository, data: TodoItem) -> Sequence[TodoItem]:
-        return todoitem_repo.add(data,auto_commit=True)
+    @post("/",dto=TodoItemCreateDTO, dependencies = {"tags_repo": Provide(provide_tag_repo)} )
+    async def add_todo(self, todoitem_repo:TodoItemRepository, tags_repo: TagRepository, data: TodoItem) -> TodoItem:
+        return todoitem_repo.add_with_tags(data,tags_repo, auto_commit=True)
     
     @get("/{item_id:int}")
     async def get_item(self, item_id: int, todoitem_repo: TodoItemRepository) -> TodoItem:
@@ -78,4 +78,27 @@ class UserConstroller(Controller):
             return users_repo.get(user_id)
         except NotFoundError:
             raise HTTPException(status_code=404, detail=f"User con id ={user_id} no existe")
+        
+    @post("/", dto=UserCreateDTO)
+    async def add_user(self, users_repo: UserRepository, data: User) -> User:
+        return users_repo.add_witch_password_hash(data, auto_commit=True)
 
+class TagController(Controller):
+    path = "/tags"
+    tags = ["tags"]
+    return_dto = TagReadDTO
+    dependencies = {
+        "tag_repo": Provide(provide_tag_repo)
+    }
+    @get("/")
+    async def list_tags(self, tag_repo: TagRepository) -> Sequence[Tag]:
+        return tag_repo.list()
+    
+class AuthController(Controller):
+    path = "/auth"
+    tags = ["auth"]
+
+    @post("/login", dependencies = {"user_repo": Provide(provide_user_repo)})
+    async def login(self, username: str, password: str, user_repo:UserRepository)->dict:
+        password_valid = user_repo.check_password(username,password)
+        return {"valid": password_valid}
