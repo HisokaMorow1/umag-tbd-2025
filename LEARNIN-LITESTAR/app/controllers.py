@@ -1,13 +1,18 @@
-from typing import Sequence
+from textwrap import indent
+from typing import Annotated, Any, Sequence
 from advanced_alchemy.exceptions import NotFoundError
 from advanced_alchemy.filters import ComparisonFilter
-from litestar import Controller, get, post, patch, delete
+from litestar import Controller, Request, get, post, patch, delete, Response
+from litestar.contrib.jwt import OAuth2Login, Token
 from litestar.di import Provide
 from litestar.dto import DTOData
+from litestar.enums import RequestEncodingType
 from litestar.exceptions import HTTPException
-from app.dtos import TagReadDTO, TodoItemCreateDTO, TodoItemReadDTO, TodoItemUpdateDTO, UserCreateDTO, UserReadDTO, UserReadFullDTO, TodoItemReadFullDTO
+from litestar.params import Body
+from app.dtos import TagReadDTO, TodoItemCreateDTO, TodoItemReadDTO, TodoItemUpdateDTO, UserCreateDTO, UserLoginDTO, UserReadDTO, UserReadFullDTO, TodoItemReadFullDTO
 from app.models import Tag, TodoItem, User
 from app.repositories import TagRepository, TodoItemRepository, UserRepository, provide_tag_repo, provide_todo_item_repo, provide_user_repo
+from .security import oauth2_auth
 
 class TodoController(Controller):
     path = "/items"
@@ -65,6 +70,10 @@ class UserConstroller(Controller):
     async def list_users(self, users_repo: UserRepository) -> Sequence[User]:
         return users_repo.list()
     
+    @get("/me")
+    async def get_my_user(self, request: "Request[User,Token,Any]") -> User:
+        return request.user
+
     @get("/{user_id:int}")
     async def get_user(self, users_repo: UserRepository, user_id: int) -> User:
         try:
@@ -98,7 +107,14 @@ class AuthController(Controller):
     path = "/auth"
     tags = ["auth"]
 
-    @post("/login", dependencies = {"user_repo": Provide(provide_user_repo)})
-    async def login(self, username: str, password: str, user_repo:UserRepository)->dict:
-        password_valid = user_repo.check_password(username,password)
-        return {"valid": password_valid}
+    @post("/login", dto=UserLoginDTO, dependencies = {"users_repo": Provide(provide_user_repo)})
+    async def login(self, data: Annotated[User, Body(media_type = RequestEncodingType.URL_ENCODED)], users_repo: UserRepository) -> Response[OAuth2Login]:
+        user = users_repo.get_one_or_none(username = data.username)
+        
+        #raise Exception("Algo Salio Mal")
+    
+        if user is None or not users_repo.check_password(data.username, data.password):
+            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+        
+        return oauth2_auth.login(identifier = user.username)
+        

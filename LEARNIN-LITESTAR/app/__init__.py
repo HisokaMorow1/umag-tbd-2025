@@ -1,13 +1,11 @@
+from sys import settrace
 from litestar import Litestar, openapi
 from litestar.openapi.plugins import ScalarRenderPlugin, SwaggerRenderPlugin
-from litestar.plugins.sqlalchemy import SQLAlchemyPlugin, SQLAlchemySyncConfig
-
-from app.models import Base
+from litestar.plugins.sqlalchemy import SQLAlchemyPlugin
+from app.security import oauth2_auth
+from app.config import settings
+from app.db import db_config
 from app.controllers import AuthController, TagController, TodoController, UserConstroller
-
-db_config = SQLAlchemySyncConfig(
-    connection_string="sqlite:///db.sqlite3",create_all=True, metadata=Base.metadata
-)
 
 slqa_plugin = SQLAlchemyPlugin(config = db_config)
 
@@ -18,6 +16,7 @@ openapi_config = openapi.OpenAPIConfig(
 )
 
 app = Litestar(
-    route_handlers=[TodoController,UserConstroller, TagController, AuthController],openapi_config=openapi_config, plugins = [slqa_plugin],debug=True
+    route_handlers=[TodoController,UserConstroller, TagController, AuthController],openapi_config=openapi_config, plugins = [slqa_plugin], 
+    on_app_init = [oauth2_auth.on_app_init],debug = settings.debug,pdb_on_exception = True,
 )
 

@@ -15,13 +15,16 @@ class TodoItemUpdateDTO(SQLAlchemyDTO[TodoItem]):
     config = SQLAlchemyDTOConfig(exclude={"id","user","user_id"}, partial=True)
 
 class UserReadDTO(SQLAlchemyDTO[User]):
-    config = SQLAlchemyDTOConfig(exclude={"items"})
+    config = SQLAlchemyDTOConfig(exclude={"items","password"})
 
 class UserReadFullDTO(SQLAlchemyDTO[User]):
-    pass
+    config = SQLAlchemyDTOConfig(exclude={"password"})
 
 class TagReadDTO(SQLAlchemyDTO[Tag]):
     pass
 
 class UserCreateDTO(SQLAlchemyDTO[User]):
     config = SQLAlchemyDTOConfig(exclude={"id","items"})
+
+class UserLoginDTO(SQLAlchemyDTO[User]):
+    config = SQLAlchemyDTOConfig(include={"username","password"})

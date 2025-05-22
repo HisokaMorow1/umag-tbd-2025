@@ -37,3 +37,4 @@ class TagRepository(SQLAlchemySyncRepository[Tag]):
 
 async def provide_tag_repo(db_session: Session) -> TagRepository:
     return TagRepository(session=db_session)
+
