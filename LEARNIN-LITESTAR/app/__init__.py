@@ -1,4 +1,3 @@
-from sys import settrace
 from litestar import Litestar, openapi
 from litestar.openapi.plugins import ScalarRenderPlugin, SwaggerRenderPlugin
 from litestar.plugins.sqlalchemy import SQLAlchemyPlugin
@@ -17,6 +16,7 @@ openapi_config = openapi.OpenAPIConfig(
 
 app = Litestar(
     route_handlers=[TodoController,UserConstroller, TagController, AuthController],openapi_config=openapi_config, plugins = [slqa_plugin], 
-    on_app_init = [oauth2_auth.on_app_init],debug = settings.debug,pdb_on_exception = True,
+    on_app_init = [oauth2_auth.on_app_init],
+    debug = settings.debug,
 )
 
