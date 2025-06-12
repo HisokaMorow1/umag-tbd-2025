@@ -1,22 +1,28 @@
-from litestar import Litestar, openapi
-from litestar.openapi.plugins import ScalarRenderPlugin, SwaggerRenderPlugin
-from litestar.plugins.sqlalchemy import SQLAlchemyPlugin
+from litestar import Litestar
+from litestar.openapi import OpenAPIConfig
+from litestar.openapi.plugins import SwaggerRenderPlugin, ScalarRenderPlugin
+from litestar.config.cors import CORSConfig
+
+from app.controllers import TagController, TodoController, UserController, AuthController
+from app.db import sqla_plugin
 from app.security import oauth2_auth
 from app.config import settings
-from app.db import db_config
-from app.controllers import AuthController, TagController, TodoController, UserConstroller
 
-slqa_plugin = SQLAlchemyPlugin(config = db_config)
 
-openapi_config = openapi.OpenAPIConfig(
-    title="TODO API",
+openapi_config = OpenAPIConfig(
+    title="Todo API",
     version="0.9.9",
-    render_plugins=[SwaggerRenderPlugin(), ScalarRenderPlugin()],
-)
+    render_plugins=[SwaggerRenderPlugin(),ScalarRenderPlugin()])
 
+cors_config = CORSConfig(allow_origins=["*"])
+
+# Una lista de funciones para recibir información de la API
 app = Litestar(
-    route_handlers=[TodoController,UserConstroller, TagController, AuthController],openapi_config=openapi_config, plugins = [slqa_plugin], 
-    on_app_init = [oauth2_auth.on_app_init],
-    debug = settings.debug,
-)
-
+    route_handlers=[TodoController, UserController, TagController, AuthController], 
+    openapi_config=openapi_config,
+    plugins=[sqla_plugin],
+    debug=settings.debug,
+    cors_config=cors_config,
+    #on_app_init=[oauth2_auth.on_app_init],
+    #pdb_on_exception=True # Es para debuggear desde VSCode: Ejecutar>Iniciar depuración
+    )

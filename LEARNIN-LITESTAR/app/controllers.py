@@ -1,98 +1,110 @@
-from typing import Annotated, Any, Sequence
-from advanced_alchemy.exceptions import NotFoundError
-from advanced_alchemy.filters import ComparisonFilter
-from litestar import Controller, Request, get, post, patch, delete, Response
-from litestar.contrib.jwt import OAuth2Login, Token
+from litestar import get, post, Controller, patch, delete, Response, Request
+#from dataclasses import dataclass
+#from litestar import put, delete, patch, Router
+
 from litestar.di import Provide
 from litestar.dto import DTOData
-from litestar.enums import RequestEncodingType
 from litestar.exceptions import HTTPException
 from litestar.params import Body
-from app.dtos import TagReadDTO, TodoItemCreateDTO, TodoItemReadDTO, TodoItemUpdateDTO, UserCreateDTO, UserLoginDTO, UserReadDTO, UserReadFullDTO, TodoItemReadFullDTO
-from app.models import Tag, TodoItem, User
-from app.repositories import TagRepository, TodoItemRepository, UserRepository, provide_tag_repo, provide_todo_item_repo, provide_user_repo
-from .security import oauth2_auth
+from litestar.enums import RequestEncodingType
+from litestar.contrib.jwt import OAuth2Login, Token
+
+from advanced_alchemy.exceptions import NotFoundError
+from advanced_alchemy.filters import ComparisonFilter 
+
+from typing import Sequence, Annotated, Any
+
+from app.models import TodoItem, User, Tag
+from app.dtos import TodoItemReadDTO, TodoItemCreateDTO, TodoItemUpdateDTO, UserReadDTO, UserReadFullDTO, TodoItemReadFullDTO, TagReadDTO, UserCreateDTO, UserLoginDTO
+from app.repositories import TodoItemRepository, provide_todoitem_repo, UserRepository, provide_user_repo, TagRepository, provide_tag_repo
+from app.security import oauth2_auth
+
+'''
+Bases:
+GET: Para obtener resultados
+POST: Para enviar resultados
+PUT: Para actualizar
+PATCH: Para actualizar parcialmente
+DELETE: Para eliminar
+DATA: Siempre incluir este parametro en las funciones para que se pueda utilizar el json del Litestar
+DataTransferObjects (DTOs): Son clases que se utilizan para definir la estructura de los datos que se envían y reciben en las peticiones HTTP.
+En vez de utilizar un return por cada función. se puede añadir como atributo de la clase.
+En la función post usamos dto para entrada de datos y en la función get usamos return_dto para salida de datos.
+'''
 
 class TodoController(Controller):
-    path = "/items"
+    path = '/items'
     tags = ["items"]
-    return_dto = TodoItemReadDTO
+    return_dto=TodoItemReadDTO
     dependencies = {
-        "todoitem_repo": Provide(provide_todo_item_repo)
+        "todoitem_repo": Provide(provide_todoitem_repo)
     }
-
-    @get("/{item_id:int}/list", return_dto=TodoItemReadFullDTO)
-    async def list_item_full(self, todoitem_repo: TodoItemRepository, item_id: int) -> TodoItem:
-        try:
-            return todoitem_repo.get(item_id)
-        except NotFoundError:
-            raise HTTPException(status_code=404, detail=f"Item con id ={item_id} no existe")
-
-
     @get("/")
-    async def get_list(self, todoitem_repo: TodoItemRepository, done: bool | None = None) -> Sequence[TodoItem]:
+    async def list_items(self, todoitem_repo: TodoItemRepository, done: bool | None = None) -> Sequence[TodoItem]:
+        #return todoitem_repo.list(CollectionFilter("done", [done]))
         if done is None:
             return todoitem_repo.list()
-        return todoitem_repo.list(ComparisonFilter("done","eq",done)) 
-
-    @post("/",dto=TodoItemCreateDTO, dependencies = {"tags_repo": Provide(provide_tag_repo)} )
-    async def add_todo(self, todoitem_repo:TodoItemRepository, tags_repo: TagRepository, data: TodoItem) -> TodoItem:
-        return todoitem_repo.add_with_tags(data,tags_repo, auto_commit=True)
-    
+        return todoitem_repo.list(ComparisonFilter("done", "eq", done))
+    @post("/", dto=TodoItemCreateDTO, dependencies={"tags_repo": Provide(provide_tag_repo)})
+    async def add_todo(self, todoitem_repo: TodoItemRepository, tags_repo: TagRepository, data: TodoItem) -> TodoItem:
+        return todoitem_repo.add_with_tags(data, tags_repo, auto_commit=True)
+       
     @get("/{item_id:int}")
     async def get_item(self, item_id: int, todoitem_repo: TodoItemRepository) -> TodoItem:
         try:
             return todoitem_repo.get(item_id)
         except NotFoundError:
-            raise HTTPException(status_code=404, detail=f"Item con id ={item_id} no existe")
+            raise HTTPException(status_code=404, detail=f"El item con id={item_id} no existe.")
     
+    @get("/{item_id:int}/full", return_dto=TodoItemReadFullDTO)
+    async def get_item_full(self, todoitem_repo: TodoItemRepository, item_id: int) -> TodoItem:
+        try:
+            return todoitem_repo.get(item_id)
+        except NotFoundError:
+            raise HTTPException(status_code=404, detail=f"El user con id={item_id} no existe.")
+            
+
     @patch("/{item_id:int}", dto=TodoItemUpdateDTO)
-    async def update_item(self, todoitem_repo: TodoItemRepository, item_id: int, data: DTOData[TodoItem]) -> TodoItem:
-        item, _ = todoitem_repo.get_and_update(match_fields= "id", id=item_id, **data.as_builtins(),auto_commit=True)
+    async def update_item(self, todoitem_repo: TodoItemRepository, item_id: int, data: DTOData[TodoItem]) -> TodoItem | None:
+        item, _ = todoitem_repo.get_and_update(match_fields="id", id=item_id, **data.as_builtins(), auto_commit=True)       
         return item
-    
+
     @delete("/{item_id:int}")
     async def delete_item(self, item_id: int, todoitem_repo: TodoItemRepository) -> None:
-        todoitem_repo.delete(item_id,auto_commit=True)
+        todoitem_repo.delete(item_id, auto_commit=True)
 
-
-
-class UserConstroller(Controller):
-    path = "/users"
+class UserController(Controller):
+    path = '/users'
     tags = ["users"]
-    dependencies = {
-        "users_repo": Provide(provide_user_repo)
-    }
     return_dto = UserReadDTO
-
+    dependencies = {
+        "user_repo": Provide(provide_user_repo)
+    }
     @get("/")
-    async def list_users(self, users_repo: UserRepository) -> Sequence[User]:
-        return users_repo.list()
-    
+    async def list_users(self, user_repo: UserRepository) -> Sequence[User]:
+        return user_repo.list()
+    @get("/{user_id:int}")
+    async def get_user(self, user_repo: UserRepository, user_id: int) -> User:
+        try:
+            return user_repo.get(user_id)
+        except NotFoundError:
+            raise HTTPException(status_code=404, detail=f"El user con id={user_id} no existe.")
+    @get("/{user_id:int}/full", return_dto=UserReadFullDTO)
+    async def get_user_full(self, user_repo: UserRepository, user_id: int) -> User:
+        try:
+            return user_repo.get(user_id)
+        except NotFoundError:
+            raise HTTPException(status_code=404, detail=f"El user con id={user_id} no existe.")
+        
     @get("/me")
-    async def get_my_user(self, request: "Request[User,Token,Any]") -> User:
+    async def get_my_user(self, request: "Request[User, Token, Any]") -> User:
         return request.user
 
-    @get("/{user_id:int}")
-    async def get_user(self, users_repo: UserRepository, user_id: int) -> User:
-        try:
-            return users_repo.get(user_id)
-        except NotFoundError:
-            raise HTTPException(status_code=404, detail=f"User con id ={user_id} no existe")
-        
-    @get("/{user_id:int}/full", return_dto=UserReadFullDTO)
-    async def get_user_full(self, users_repo: UserRepository, user_id: int) -> User:
-        try:
-            return users_repo.get(user_id)
-        except NotFoundError:
-            raise HTTPException(status_code=404, detail=f"User con id ={user_id} no existe")
-        
     @post("/", dto=UserCreateDTO)
-    async def add_user(self, users_repo: UserRepository, data: User) -> User:
-        return users_repo.add_witch_password_hash(data, auto_commit=True)
-
+    async def add_user(self, user_repo: UserRepository, data: User) -> User:
+        return user_repo.add_with_password_hash(data, auto_commit=True)
 class TagController(Controller):
-    path = "/tags"
+    path = '/tags'
     tags = ["tags"]
     return_dto = TagReadDTO
     dependencies = {
@@ -101,19 +113,31 @@ class TagController(Controller):
     @get("/")
     async def list_tags(self, tag_repo: TagRepository) -> Sequence[Tag]:
         return tag_repo.list()
-    
+    @get("/{tag_id:int}")
+    async def get_tag(self, tag_repo: TagRepository, tag_id: int) -> Tag:
+        try:
+            return tag_repo.get(tag_id)
+        except NotFoundError:
+            raise HTTPException(status_code=404, detail=f"El tag con id={tag_id} no existe.")
+        
+
 class AuthController(Controller):
     path = "/auth"
     tags = ["auth"]
 
-    @post("/login", dto=UserLoginDTO, dependencies = {"users_repo": Provide(provide_user_repo)})
-    async def login(self, data: Annotated[User, Body(media_type = RequestEncodingType.URL_ENCODED)], users_repo: UserRepository) -> Response[OAuth2Login]:
-        user = users_repo.get_one_or_none(username = data.username)
+    @post("/login", dto=UserLoginDTO,
+          dependencies={"users_repo": Provide(provide_user_repo)})
+    async def login(self, 
+                    data: Annotated[User, Body(media_type=RequestEncodingType.URL_ENCODED)],
+                    users_repo: UserRepository,
+                    ) -> Response[OAuth2Login]:
         
-        #raise Exception("Algo Salio Mal")
-    
+        #raise Exception("Algo salió muy mal x.x")
+
+        user = users_repo.get_one_or_none(username=data.username)
+
         if user is None or not users_repo.check_password(data.username, data.password):
-            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
-        
-        return oauth2_auth.login(identifier = user.username)
-        
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+
+        return oauth2_auth.login(identifier=user.username)
